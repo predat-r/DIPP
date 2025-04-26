@@ -12,7 +12,6 @@ int main()
         return -1;
     }
 
-    // Define popular sizes (width x height)
     vector<pair<int, int>> sizes = {
         {1920, 1080},   // Full HD
         {1280, 720},    // HD
