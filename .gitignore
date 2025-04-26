@@ -1,0 +1,19 @@
+# macOS system files
+.DS_Store
+
+# Build artifacts
+*.o
+*.out
+*.exe
+*.bin
+*.obj
+*.log
+*.dSYM/
+
+# VSCode settings
+.vscode/
+
+# Output images
+output.jpg
+*.png
+*.jpg
