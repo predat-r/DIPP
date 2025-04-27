@@ -21,6 +21,8 @@ public:
     void sendImage(const cv::Mat &img);
 
     cv::Mat recvImage();
+
+    void close();
 };
 
 #endif // COMMUNICATION_HANDLER_HPP

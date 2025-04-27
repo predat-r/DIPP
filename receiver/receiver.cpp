@@ -1,31 +1,36 @@
+#include <zmq.hpp>
 #include <opencv2/opencv.hpp>
 #include <iostream>
-#include <amqpcpp.h>
-#include <unistd.h>
-#include <ctime>
-#include <sstream>
-#include <fstream>
-
-using namespace std;
-using namespace cv;
-using namespace AMQP;
+#include "CommunicationHandler.hpp"
+#include <chrono>
+#include <thread>
 
 int main()
 {
     try
     {
+        CommunicationHandler handler(zmq::socket_type::push, 1);
 
-        Mat image = imread("../image.jpg");
+        handler.establishConnection("tcp://*:5555");
+
+        cv::Mat image = cv::imread("../image.jpg", cv::IMREAD_COLOR);
         if (image.empty())
         {
-            cerr << "Failed to load image!" << endl;
+            std::cerr << "Error loading image!" << std::endl;
             return -1;
         }
-        cout << "Image loaded" << endl;
+
+        std::cout << "Sending image from reciever to preprocessor..." << std::endl;
+        handler.sendImage(image);
+        std::cout << "Image sent!" << std::endl;
+
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+        handler.close();
         return 0;
     }
-    catch (Exception e)
+    catch (const std::exception &e)
     {
-        cout << "Error" << e.what() << endl;
+        std::cerr << "Error: " << e.what() << std::endl;
+        return -1;
     }
 }

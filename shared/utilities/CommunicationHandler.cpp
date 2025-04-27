@@ -72,3 +72,6 @@ cv::Mat CommunicationHandler::recvImage()
     cv::Mat img = cv::imdecode(buffer, cv::IMREAD_COLOR);
     return img;
 }
+void CommunicationHandler::close(){
+    this->socket.close();
+}
