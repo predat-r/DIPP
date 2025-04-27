@@ -1,37 +1,31 @@
-#include <string>
-#include <chrono>
-#include <thread>
-#include <iostream>
 #include <zmq.hpp>
+#include <opencv2/opencv.hpp>
+#include <iostream>
+#include <vector>
 
-int main() 
-{
-    using namespace std::chrono_literals;
+int main() {
+    // Create ZeroMQ context and socket
+    zmq::context_t context(1);
+    zmq::socket_t socket(context, zmq::socket_type::pull);
+    socket.connect("tcp://localhost:5555");  // Connect to sender
 
-    // initialize the zmq context with a single IO thread
-    zmq::context_t context{1};
+    // Receive the image data
+    zmq::message_t message;
+    socket.recv(message, zmq::recv_flags::none);
 
-    // construct a REP (reply) socket and bind to interface
-    zmq::socket_t socket{context, zmq::socket_type::rep};
-    socket.bind("tcp://*:5555");
+    // Convert received data to byte vector
+    std::vector<uchar> buffer(static_cast<uchar*>(message.data()), static_cast<uchar*>(message.data()) + message.size());
 
-    // prepare some static data for responses
-    const std::string data{"World"};
-
-    for (;;) 
-    {
-        zmq::message_t request;
-
-        // receive a request from client
-        socket.recv(request, zmq::recv_flags::none);
-        std::cout << "Received " << request.to_string() << std::endl;
-
-        // simulate work
-        std::this_thread::sleep_for(1s);
-
-        // send the reply to the client
-        socket.send(zmq::buffer(data), zmq::send_flags::none);
+    // Decode the byte array to an OpenCV image
+    cv::Mat img = cv::imdecode(buffer, cv::IMREAD_COLOR);
+    if (img.empty()) {
+        std::cerr << "Error decoding image!" << std::endl;
+        return -1;
     }
+
+    // Show the received image
+    cv::imshow("Received Image", img);
+    cv::waitKey(0);
 
     return 0;
 }

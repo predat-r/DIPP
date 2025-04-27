@@ -1,33 +1,31 @@
-#include <string>
-#include <iostream>
 #include <zmq.hpp>
+#include <opencv2/opencv.hpp>
+#include <iostream>
+#include <fstream>
 
-int main()
-{
-    // initialize the zmq context with a single IO thread
-    zmq::context_t context{1};
-
-    // construct a REQ (request) socket and connect to interface
-    zmq::socket_t socket{context, zmq::socket_type::req};
-    socket.connect("tcp://localhost:5555");
-
-    // set up some static data to send
-    const std::string data{"Hello"};
-
-    for (auto request_num = 0; request_num < 10; ++request_num) 
-    {
-        // send the request message
-        std::cout << "Sending Hello " << request_num << "..." << std::endl;
-        socket.send(zmq::buffer(data), zmq::send_flags::none);
-        
-        // wait for reply from server
-        zmq::message_t reply{};
-        socket.recv(reply, zmq::recv_flags::none);
-
-        std::cout << "Received " << reply.to_string(); 
-        std::cout << " (" << request_num << ")";
-        std::cout << std::endl;
+int main() {
+    // Load image using OpenCV
+    cv::Mat image = cv::imread("image.jpg", cv::IMREAD_COLOR);
+    if (image.empty()) {
+        std::cerr << "Error loading image!" << std::endl;
+        return -1;
     }
+
+    // Convert image to raw byte array
+    std::vector<uchar> buffer;
+    cv::imencode(".jpg", image, buffer);
+
+    // Create ZeroMQ context and socket
+    zmq::context_t context(1);
+    zmq::socket_t socket(context, zmq::socket_type::push);
+    socket.bind("tcp://localhost:5555");  // Bind to port 5555
+
+    // Send the image data
+    zmq::message_t message(buffer.size());
+    memcpy(message.data(), buffer.data(), buffer.size());
+    socket.send(message, zmq::send_flags::none);
+
+    std::cout << "Image sent!" << std::endl;
 
     return 0;
 }
