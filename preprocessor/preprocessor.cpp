@@ -11,16 +11,12 @@ int main()
 {
     try
     {
+        // Handler for receiving images
         CommunicationHandler handler(zmq::socket_type::pull, 1);
-
-        std::cout << "Starting receiver..." << std::endl;
         handler.establishConnection("tcp://127.0.0.1:5555");
 
-        std::cout << "Waiting for image..." << std::endl;
+        const string imgExtension = handler.recvMsg();
         cv::Mat img = handler.recvImage();
-
-
-        cout << "Recieved image"<<endl;
 
         if (img.empty())
         {
@@ -28,29 +24,55 @@ int main()
             return -1;
         }
 
+        // Convert to 32-bit float for processing to preserve precision
+        Mat processedFloat;
+        img.convertTo(processedFloat, CV_32F, 1.0 / 255.0);
+
+        // Working in Lab color space to separate luminance from color
+        Mat labImage;
+        cvtColor(processedFloat, labImage, COLOR_BGR2Lab);
+
         // Splitting channels
-        vector<Mat> channels;
-        split(img, channels);
+        vector<Mat> labChannels;
+        split(labImage, labChannels);
 
-        // Histogram Equalization per channel
-        for (int i = 0; i < channels.size(); i++)
-        {
-            equalizeHist(channels[i], channels[i]);
-        }
+        // Enhancing only the L channel
+        Mat &lChannel = labChannels[0];
 
-        // Merging back
-        Mat equalized;
-        merge(channels, equalized);
+        // Subtle contrast adjustment on L channel (luminance only)
+        double minVal, maxVal;
+        minMaxLoc(lChannel, &minVal, &maxVal);
+        lChannel = (lChannel - minVal) * (1.0 / (maxVal - minVal)) * 100.0;
 
-        // Sharpening Kernel
-        Mat kernel = (Mat_<float>(3, 3) << 0, -1, 0,
-                      -1, 4.5, -1,
-                      0, -1, 0);
-        Mat sharpened;
-        filter2D(equalized, sharpened, equalized.depth(), kernel);
+        // Subtle unsharp mask for the L channel
+        Mat blurred;
+        GaussianBlur(lChannel, blurred, Size(0, 0), 2.0);
+        lChannel = lChannel + 0.5 * (lChannel - blurred);
 
-        imwrite("../output.jpg", sharpened);
+        // Merging channels back
+        Mat enhancedLab;
+        merge(labChannels, enhancedLab);
+
+        // Converting back to BGR
+        Mat enhanced;
+        cvtColor(enhancedLab, enhanced, COLOR_Lab2BGR);
+
+        // Converting back to original bit depth
+        Mat processed;
+        enhanced.convertTo(processed, img.type(), 255.0);
+
+        // Quality check: ensuring values are in valid range
+        cv::normalize(processed, processed, 0, 255, NORM_MINMAX);
+
+        // Handler for sending images to next step in pipe
+        CommunicationHandler handler2(zmq::socket_type::push, 1);
+        handler2.establishConnection("tcp://*:5556");
+        handler2.sendMsg(imgExtension);
+        handler2.sendImage(processed);
+
+        std::this_thread::sleep_for(std::chrono::seconds(1));
         handler.close();
+        handler2.close();
         return 0;
     }
     catch (const std::exception &e)

@@ -4,25 +4,29 @@
 #include "CommunicationHandler.hpp"
 #include <chrono>
 #include <thread>
+#include <filesystem>
 
 int main()
 {
     try
     {
-        CommunicationHandler handler(zmq::socket_type::push, 1);
 
+        // Handler for sending images ( start point of the pipe)
+        CommunicationHandler handler(zmq::socket_type::push, 1);
         handler.establishConnection("tcp://*:5555");
 
-        cv::Mat image = cv::imread("../image.jpg", cv::IMREAD_COLOR);
+        std::filesystem::path imagePath = "../image.jpg";
+        cv::Mat image = cv::imread(imagePath, cv::IMREAD_COLOR);
+        std::string imgExtension = imagePath.extension().string();
+        handler.sendMsg(imgExtension);
+
         if (image.empty())
         {
             std::cerr << "Error loading image!" << std::endl;
             return -1;
         }
 
-        std::cout << "Sending image from reciever to preprocessor..." << std::endl;
         handler.sendImage(image);
-        std::cout << "Image sent!" << std::endl;
 
         std::this_thread::sleep_for(std::chrono::seconds(1));
         handler.close();

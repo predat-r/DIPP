@@ -16,13 +16,12 @@ CommunicationHandler::CommunicationHandler(zmq::socket_type socket_type, int con
 
         std::cout << "Socket initialized with type: " << static_cast<int>(this->socket_type) << std::endl;
     }
-    catch (const zmq::error_t& e)
+    catch (const zmq::error_t &e)
     {
         std::cerr << "ZMQ Error during constructor: " << e.what() << std::endl;
         throw; // propagate
     }
 }
-
 
 void CommunicationHandler::establishConnection(const std::string &address)
 {
@@ -55,8 +54,9 @@ void CommunicationHandler::establishConnection(const std::string &address)
 
 void CommunicationHandler::sendImage(const cv::Mat &img)
 {
+    std::vector<int> compression_params = {cv::IMWRITE_JPEG_QUALITY, 100};
     std::vector<uchar> buffer;
-    cv::imencode(".jpg", img, buffer);
+    cv::imencode(".jpg", img, buffer, compression_params);
     zmq::message_t message(buffer.size());
     memcpy(message.data(), buffer.data(), buffer.size());
     socket.send(message, zmq::send_flags::none);
@@ -72,6 +72,20 @@ cv::Mat CommunicationHandler::recvImage()
     cv::Mat img = cv::imdecode(buffer, cv::IMREAD_COLOR);
     return img;
 }
-void CommunicationHandler::close(){
+void CommunicationHandler::sendMsg(const std::string &msg)
+{
+    zmq::message_t message(msg.size());
+    memcpy(message.data(), msg.data(), msg.size());
+    socket.send(message, zmq::send_flags::none);
+}
+std::string CommunicationHandler::recvMsg()
+{
+    zmq::message_t message;
+    socket.recv(message, zmq::recv_flags::none);
+    std::string msg(static_cast<char *>(message.data()), message.size());
+    return msg;
+}
+void CommunicationHandler::close()
+{
     this->socket.close();
 }

@@ -21,6 +21,8 @@ public:
     void sendImage(const cv::Mat &img);
 
     cv::Mat recvImage();
+    void sendMsg(const std::string &msg);
+    std::string recvMsg();
 
     void close();
 };
