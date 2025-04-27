@@ -9,13 +9,16 @@
                 "-fcolor-diagnostics",
                 "-I/opt/homebrew/Cellar/opencv/4.11.0_1/include/opencv4",
                 "-I${env:HOME}/local/include",
+                "-I${workspaceFolder}/shared/cppzmq",
+                "-I/opt/homebrew/Cellar/zeromq/4.3.5_1/include",   
                 "-L/opt/homebrew/Cellar/opencv/4.11.0_1/lib",
+                "-L/opt/homebrew/Cellar/zeromq/4.3.5_1/lib",
+                "-lzmq",
                 "-L${env:HOME}/local/lib",
                 "-lopencv_core",
                 "-lopencv_imgproc",
                 "-lopencv_imgcodecs",
-                "-lopencv_photo",
-                "-lamqpcpp",
+                "-lopencv_photo",          
                 "-fansi-escape-codes",
                 "-g",
                 "${file}",
@@ -23,7 +26,11 @@
                 "${fileDirname}/${fileBasenameNoExtension}"
             ],
             "options": {
-                "cwd": "${fileDirname}"
+                "cwd": "${fileDirname}",
+                "env": {
+                    "DYLD_LIBRARY_PATH": "/Users/haris/local/lib",
+                    "PATH": "${env:PATH}"
+                }
             },
             "problemMatcher": [
                 "$gcc"
