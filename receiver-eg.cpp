@@ -2,30 +2,31 @@
 #include <opencv2/opencv.hpp>
 #include <iostream>
 #include <vector>
+#include "CommunicationHandler.hpp"
 
-int main() {
-    // Create ZeroMQ context and socket
-    zmq::context_t context(1);
-    zmq::socket_t socket(context, zmq::socket_type::pull);
-    socket.connect("tcp://localhost:5555");  // Connect to sender
+int main()
+{
+    try {
+        CommunicationHandler handler(zmq::socket_type::pull, 1);
+        
+        std::cout << "Starting receiver..." << std::endl;
+        handler.establishConnection("tcp://127.0.0.1:5555");
+        
+        std::cout << "Waiting for image..." << std::endl;
+        cv::Mat img = handler.recvImage();
 
-    // Receive the image data
-    zmq::message_t message;
-    socket.recv(message, zmq::recv_flags::none);
+        if (img.empty()) {
+            std::cerr << "Error decoding image!" << std::endl;
+            return -1;
+        }
 
-    // Convert received data to byte vector
-    std::vector<uchar> buffer(static_cast<uchar*>(message.data()), static_cast<uchar*>(message.data()) + message.size());
+        cv::imshow("Received Image", img);
+        cv::waitKey(0);
 
-    // Decode the byte array to an OpenCV image
-    cv::Mat img = cv::imdecode(buffer, cv::IMREAD_COLOR);
-    if (img.empty()) {
-        std::cerr << "Error decoding image!" << std::endl;
+        return 0;
+    }
+    catch (const std::exception& e) {
+        std::cerr << "Error: " << e.what() << std::endl;
         return -1;
     }
-
-    // Show the received image
-    cv::imshow("Received Image", img);
-    cv::waitKey(0);
-
-    return 0;
 }
