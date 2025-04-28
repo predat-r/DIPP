@@ -1,34 +1,49 @@
 #include <opencv2/opencv.hpp>
 #include <iostream>
+#include "CommunicationHandler.hpp"
+#include <zmq.hpp>
+#include <chrono>
+#include <thread>
+
 using namespace cv;
 using namespace std;
 
 int main()
 {
-    Mat img = imread("../image.jpg");
-    if (img.empty())
+    // Handler for receiving images
+    CommunicationHandler handler(zmq::socket_type::pull, 1);
+    handler.establishConnection("tcp://127.0.0.1:5558");
+    const string imageExtension = handler.recvMsg();
+
+    cv::Mat img[5];
+    for (int i = 0; i < 5; i++)
     {
-        cout << "Failed to load image" << endl;
-        return -1;
+        img[i] = handler.recvImage();
+        if (img[i].empty())
+        {
+            cout << "Failed to load image " << i << endl;
+            return -1;
+        }
     }
 
     vector<int> compression_params;
-    string filename = "../image.jpg";
-    
-    // Setting image compression Parameters based on image type
-    if (filename.find(".jpg") != string::npos || filename.find(".jpeg") != string::npos)
+    if (imageExtension == ".jpg" || imageExtension == ".jpeg")
     {
         compression_params.push_back(IMWRITE_JPEG_QUALITY);
-        compression_params.push_back(60); // JPEG quality 0-100
+        compression_params.push_back(60);
     }
-    else if (filename.find(".png") != string::npos)
+    else if (imageExtension == ".png")
     {
         compression_params.push_back(IMWRITE_PNG_COMPRESSION);
-        compression_params.push_back(6); // PNG compression level 0-9
+        compression_params.push_back(6);
     }
 
-    // Saving compressed image
-    imwrite("../output.jpg", img, compression_params);
+    // Save all images
+    for (int i = 0; i < 5; i++)
+    {
+        string filename = "../output_" + to_string(i) + imageExtension;
+        imwrite(filename, img[i], compression_params);
+    }
 
     cout << "Compression done." << endl;
 

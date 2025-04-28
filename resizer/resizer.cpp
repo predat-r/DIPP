@@ -33,8 +33,8 @@ int main()
         };
 
         CommunicationHandler handler2(zmq::socket_type::push, 1);
-        handler2.establishConnection("tcp://*:5556");
-        handler2.sendMsg(imgExtension);
+        handler2.establishConnection("tcp://*:5557");
+        handler2.sendMsg(imageExtension);
 
         for (auto [w, h] : sizes)
         {
