@@ -62,15 +62,30 @@ void CommunicationHandler::sendImage(const cv::Mat &img)
     socket.send(message, zmq::send_flags::none);
 }
 
-cv::Mat CommunicationHandler::recvImage()
+cv::Mat CommunicationHandler::recvImage(int timeout_ms)
 {
+    socket.set(zmq::sockopt::rcvtimeo, timeout_ms); 
+
     zmq::message_t message;
-    socket.recv(message, zmq::recv_flags::none);
+    try
+    {
+        auto result = socket.recv(message, zmq::recv_flags::none);
+        if (!result.has_value())
+        {
+            std::cerr << "recvImage timed out after " << timeout_ms << "ms\n";
+            return cv::Mat(); 
+        }
+    }
+    catch (const zmq::error_t &e)
+    {
+        std::cerr << "ZMQ Error in recvImage: " << e.what() << std::endl;
+        return cv::Mat();
+    }
+
     std::vector<uchar> buffer(
         static_cast<uchar *>(message.data()),
         static_cast<uchar *>(message.data()) + message.size());
-    cv::Mat img = cv::imdecode(buffer, cv::IMREAD_COLOR);
-    return img;
+    return cv::imdecode(buffer, cv::IMREAD_COLOR);
 }
 void CommunicationHandler::sendMsg(const std::string &msg)
 {

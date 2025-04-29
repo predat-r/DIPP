@@ -23,7 +23,6 @@
                 "-lopencv_imgcodecs",
                 "-lopencv_photo",
                 "-fansi-escape-codes",
-                "-g",
                 "${file}",
                 "${workspaceFolder}/shared/utilities/CommunicationHandler.cpp", 
                 "-o",

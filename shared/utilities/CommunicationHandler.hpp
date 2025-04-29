@@ -20,7 +20,7 @@ public:
 
     void sendImage(const cv::Mat &img);
 
-    cv::Mat recvImage();
+    cv::Mat recvImage(int timeout_ms);
     void sendMsg(const std::string &msg);
     std::string recvMsg();
 
