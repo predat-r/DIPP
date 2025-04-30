@@ -2,39 +2,46 @@
 #include <iostream>
 #include <chrono>
 #include <thread>
+
+// Constructor: Sets up ZMQ context and socket
 CommunicationHandler::CommunicationHandler(zmq::socket_type socket_type, int context_size)
 {
     try
     {
+        // Stored socket type for connection management
         this->socket_type = socket_type;
 
-        // Initialize context
+        // Created new ZMQ context
         this->context = zmq::context_t(context_size);
 
-        // Initialize socket using the context and socket_type
+        // Created socket from context and type
         this->socket = zmq::socket_t(this->context, this->socket_type);
 
         std::cout << "Socket initialized with type: " << static_cast<int>(this->socket_type) << std::endl;
     }
     catch (const zmq::error_t &e)
     {
+        // Logged error and propagated exception
         std::cerr << "ZMQ Error during constructor: " << e.what() << std::endl;
-        throw; // propagate
+        throw;
     }
 }
 
+// Sets up connection based on socket type
 void CommunicationHandler::establishConnection(const std::string &address)
 {
     try
     {
         if (this->socket_type == zmq::socket_type::pull)
         {
-            std::cout << "Connecting PULL socket to: " << address << std::endl;
+            // Connected PULL socket to specified address
+            std::cout << "Connects PULL socket to: " << address << std::endl;
             socket.connect(address);
         }
         else if (this->socket_type == zmq::socket_type::push)
         {
-            std::cout << "Binding PUSH socket to: " << address << std::endl;
+            // Bound PUSH socket to specified address
+            std::cout << "Binds PUSH socket to: " << address << std::endl;
             socket.bind(address);
         }
         else
@@ -42,29 +49,38 @@ void CommunicationHandler::establishConnection(const std::string &address)
             throw std::runtime_error("Unsupported socket type");
         }
 
-        // Add small delay after binding/connecting
+        // Added delay to ensure connection setup
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
     catch (const zmq::error_t &e)
     {
+        // Logged error and propagated exception
         std::cerr << "ZMQ Error: " << e.what() << std::endl;
         throw;
     }
 }
 
+// Encodes and sends image through ZMQ socket
 void CommunicationHandler::sendImage(const cv::Mat &img)
 {
+    // Set JPEG quality parameters
     std::vector<int> compression_params = {cv::IMWRITE_JPEG_QUALITY, 100};
     std::vector<uchar> buffer;
+
+    // Encoded image to JPEG format
     cv::imencode(".jpg", img, buffer, compression_params);
+
+    // Created and sent ZMQ message
     zmq::message_t message(buffer.size());
     memcpy(message.data(), buffer.data(), buffer.size());
     socket.send(message, zmq::send_flags::none);
 }
 
+// Receives and decodes image from ZMQ socket
 cv::Mat CommunicationHandler::recvImage(int timeout_ms)
 {
-    socket.set(zmq::sockopt::rcvtimeo, timeout_ms); 
+    // Set receive timeout
+    socket.set(zmq::sockopt::rcvtimeo, timeout_ms);
 
     zmq::message_t message;
     try
@@ -73,7 +89,7 @@ cv::Mat CommunicationHandler::recvImage(int timeout_ms)
         if (!result.has_value())
         {
             std::cerr << "recvImage timed out after " << timeout_ms << "ms\n";
-            return cv::Mat(); 
+            return cv::Mat();
         }
     }
     catch (const zmq::error_t &e)

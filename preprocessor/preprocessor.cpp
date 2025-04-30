@@ -11,66 +11,71 @@ int main()
 {
     try
     {
-        // Handler for receiving images
+        // Setting up the input connection to receive images from the previous stage
         CommunicationHandler handler(zmq::socket_type::pull, 1);
         handler.establishConnection("tcp://127.0.0.1:5555");
-        // Handler for sending images to next step in pipe
+        
+        // Setting up the output connection to send processed images to the next stage
         CommunicationHandler handler2(zmq::socket_type::push, 1);
         handler2.establishConnection("tcp://*:5556");
+
         while (true)
         {
+            // Receiving the image format information
             const string imgExtension = handler.recvMsg();
+            
+            // Receiving and checking the image data
             cv::Mat img = handler.recvImage(10000000);
-            cout<<"recieved an image"<<endl;
+            cout<<"received an image"<<endl;
 
-            if (img.empty())
-            {
-                break;
-            }
+            if (img.empty()) break;
 
-            // Convert to 32-bit float for processing to preserve precision
+            // Converting image to floating point for more precise calculations
             Mat processedFloat;
             img.convertTo(processedFloat, CV_32F, 1.0 / 255.0);
 
-            // Working in Lab color space to separate luminance from color
+            // Converting to Lab color space to separate luminance from chrominance
             Mat labImage;
             cvtColor(processedFloat, labImage, COLOR_BGR2Lab);
 
-            // Splitting channels
+            // Extracting individual channels for selective processing
             vector<Mat> labChannels;
             split(labImage, labChannels);
 
-            // Enhancing only the L channel
+            // Processing only the luminance channel for enhanced contrast
             Mat &lChannel = labChannels[0];
-
-            // Subtle contrast adjustment on L channel (luminance only)
+            
+            // Normalizing the luminance channel to full range
             double minVal, maxVal;
             minMaxLoc(lChannel, &minVal, &maxVal);
             lChannel = (lChannel - minVal) * (1.0 / (maxVal - minVal)) * 100.0;
 
-            // Subtle unsharp mask for the L channel
+            // Applying unsharp masking for edge enhancement
             Mat blurred;
             GaussianBlur(lChannel, blurred, Size(0, 0), 2.0);
             lChannel = lChannel + 0.5 * (lChannel - blurred);
 
-            // Merging channels back
+            // Recombining the channels after processing
             Mat enhancedLab;
             merge(labChannels, enhancedLab);
 
-            // Converting back to BGR
+            // Converting back to BGR color space
             Mat enhanced;
             cvtColor(enhancedLab, enhanced, COLOR_Lab2BGR);
 
-            // Converting back to original bit depth
+            // Converting back to 8-bit depth
             Mat processed;
             enhanced.convertTo(processed, img.type(), 255.0);
 
-            // Quality check: ensuring values are in valid range
+            // Ensuring pixel values are within valid range
             cv::normalize(processed, processed, 0, 255, NORM_MINMAX);
 
+            // Sending the processed image to the next stage
             handler2.sendMsg(imgExtension);
             handler2.sendImage(processed);
         }
+
+        // Cleanup and resource release
         std::this_thread::sleep_for(std::chrono::seconds(1));
         handler.close();
         handler2.close();

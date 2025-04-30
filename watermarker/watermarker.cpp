@@ -9,22 +9,26 @@ int main()
 {
     try
     {
-        // Connect and receive images
+        // Creating connection to receive processed images from resizer
         CommunicationHandler handler(zmq::socket_type::pull, 1);
         handler.establishConnection("tcp://127.0.0.1:5557");
+
+        // Reading image format from the message queue
         std::string imageExtension = handler.recvMsg();
-        // Handler for sending images to next step in pipe
+
+        // Creating connection to send watermarked images to compressor
         CommunicationHandler handler2(zmq::socket_type::push, 1);
         handler2.establishConnection("tcp://*:5558");
 
         while (true)
         {
-            // Receive 5 images of different sizes
+            // Collecting 5 different sized images from the resizer
             std::vector<cv::Mat> images;
             for (int i = 0; i < 5; i++)
             {
                 cv::Mat img = handler.recvImage(10000000);
-                std::cout <<std::endl<<"recieved an image" << std::endl;
+                std::cout << std::endl
+                          << "Received image " << i + 1 << " of 5" << std::endl;
                 if (img.empty())
                 {
                     break;
@@ -32,45 +36,50 @@ int main()
                 images.push_back(img);
             }
 
-            // Load watermark
+            // Loading the watermark image with alpha channel
             cv::Mat watermark = cv::imread("../watermark.png", cv::IMREAD_UNCHANGED);
             if (watermark.empty())
             {
                 break;
             }
 
-            // Process each image
+            // Processing each image in the received batch
             for (int i = 0; i < images.size(); i++)
             {
-                // Resize watermark based on current image size
+                // Calculating watermark size based on image dimensions
                 double maxWatermarkRatio = 0.25;
                 cv::Mat resizedWatermark = watermark.clone();
                 if (watermark.cols > images[i].cols * maxWatermarkRatio ||
                     watermark.rows > images[i].rows * maxWatermarkRatio)
                 {
+                    // Scaling watermark to maintain aspect ratio
                     double scale = std::min(
                         (images[i].cols * maxWatermarkRatio) / watermark.cols,
                         (images[i].rows * maxWatermarkRatio) / watermark.rows);
                     cv::resize(watermark, resizedWatermark, cv::Size(), scale, scale);
                 }
 
-                // Position watermark
+                // Calculating bottom-right position with padding
                 int x = images[i].cols - resizedWatermark.cols - 10;
                 int y = images[i].rows - resizedWatermark.rows - 10;
                 cv::Rect roi(x, y, resizedWatermark.cols, resizedWatermark.rows);
 
-                // Apply watermark
+                // Applying alpha blending for transparent watermark
                 if (resizedWatermark.channels() == 4)
                 {
+                    // Separating color and alpha channels
                     std::vector<cv::Mat> channels;
                     cv::split(resizedWatermark, channels);
 
+                    // Creating color image from BGR channels
                     cv::Mat colorImg;
                     cv::merge(std::vector<cv::Mat>{channels[0], channels[1], channels[2]}, colorImg);
                     cv::Mat alpha = channels[3];
 
+                    // Getting region of interest for watermark placement
                     cv::Mat imgRoi = images[i](roi);
 
+                    // Blending watermark with original image using alpha channel
                     for (int r = 0; r < colorImg.rows; r++)
                     {
                         for (int c = 0; c < colorImg.cols; c++)
@@ -78,6 +87,7 @@ int main()
                             float alphaValue = alpha.at<uchar>(r, c) / 255.0f;
                             if (alphaValue > 0)
                             {
+                                // Applying alpha blending formula for each channel
                                 for (int ch = 0; ch < 3; ch++)
                                 {
                                     imgRoi.at<cv::Vec3b>(r, c)[ch] =
@@ -90,24 +100,31 @@ int main()
                 }
                 else
                 {
+                    // Copying opaque watermark directly onto image
                     resizedWatermark.copyTo(images[i](roi));
                 }
             }
-            std::cout<<"sending images";
+
+            // Sending processed images to next stage
+            std::cout << "Sending watermarked images to compressor" << std::endl;
             handler2.sendMsg(imageExtension);
-            for (int i = 0; i < 5; i++)
+            for (int i = 0; i < images.size(); i++)
             {
                 handler2.sendImage(images[i]);
             }
         }
 
+        // Allowing time for message transmission
         std::this_thread::sleep_for(std::chrono::seconds(1));
+
+        // Cleaning up ZMQ connections
         handler.close();
         handler2.close();
         return 0;
     }
     catch (const std::exception &e)
     {
+        // Logging any errors that occurred during execution
         std::cerr << "Error: " << e.what() << std::endl;
         return -1;
     }
