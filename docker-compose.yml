@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  receiver:
+    build:
+      context: .
+      dockerfile: docker/receiver.Dockerfile
+    volumes:
+      - ./images:/app/images
+    networks:
+      - dipp-network
+    depends_on:
+      - preprocessor
+
+  preprocessor:
+    build:
+      context: .
+      dockerfile: docker/preprocessor.Dockerfile
+    networks:
+      - dipp-network
+    depends_on:
+      - resizer
+
+  resizer:
+    build:
+      context: .
+      dockerfile: docker/resizer.Dockerfile
+    networks:
+      - dipp-network
+    depends_on:
+      - watermarker
+    deploy:
+      replicas: 2  # Example of scaling
+
+  watermarker:
+    build:
+      context: .
+      dockerfile: docker/watermarker.Dockerfile
+    volumes:
+      - ./watermark.png:/app/watermark.png
+    networks:
+      - dipp-network
+    depends_on:
+      - compressor
+
+  compressor:
+    build:
+      context: .
+      dockerfile: docker/compressor.Dockerfile
+    volumes:
+      - ./output:/app/output
+    networks:
+      - dipp-network
+
+networks:
+  dipp-network:
+    driver: bridge
