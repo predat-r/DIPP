@@ -50,31 +50,9 @@ Components can be used independently or in custom combinations:
 - C++17 compiler
 - CMake 3.x
 
-## Building
-
-```bash
-mkdir build && cd build
-cmake ..
-make
-```
-
-## Usage
-
-1. Place input image as `image.jpg` in the project root
-2. Place watermark as `watermark.png` in the project root
-3. Start components in order:
-
-```bash
-./compressor
-./watermarker
-./resizer
-./preprocessor
-./receiver
-```
-
 ## Output
 
-The pipeline generates five variants of each input image:
+The pipeline generates five variants of each input image (If you include the resizing module):
 - 1920x1080 (Full HD)
 - 1280x720 (HD)
 - 800x600 (SVGA)
